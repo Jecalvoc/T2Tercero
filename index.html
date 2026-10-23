@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔋 Energía Laberinto - Juego de Energías</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            color: #fff;
+        }
+        #title {
+            text-align: center;
+            padding: 12px;
+            font-size: 26px;
+            font-weight: bold;
+            background: linear-gradient(90deg, #4fc3f7, #81c784, #ffb74d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-top: 8px;
+        }
+        #instructions {
+            text-align: center;
+            padding: 6px;
+            font-size: 13px;
+            color: #bbb;
+        }
+        #levelInfo {
+            text-align: center;
+            padding: 8px;
+            font-size: 14px;
+            color: #ffb74d;
+            background: rgba(255,183,77,0.1);
+            border-radius: 8px;
+            margin: 6px 0;
+            max-width: 750px;
+            width: 95%;
+            border: 1px solid rgba(255,183,77,0.3);
+            min-height: 36px;
+        }
+        #gameCanvas {
+            border: 3px solid #4fc3f7;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(79,195,247,0.3);
+            display: block;
+            background: #0d1b2a;
+        }
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 750px;
+            max-width: 95vw;
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 10px;
+            margin-top: 8px;
+            border: 1px solid rgba(79,195,247,0.3);
+        }
+        .hud-item { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+        .hud-item .label { color: #aaa; font-size: 11px; }
+        .hud-item .value { color: #4fc3f7; font-weight: bold; font-size: 15px; }
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .overlay-content {
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            border: 2px solid #4fc3f7;
+            border-radius: 20px;
+            padding: 35px;
+            text-align: center;
+            max-width: 520px;
+            box-shadow: 0 0 50px rgba(79,195,247,0.2);
+        }
+        .overlay-content h2 { font-size: 26px; margin-bottom: 12px; color: #4fc3f7; }
+        .overlay-content p { font-size: 15px; color: #ccc; margin-bottom: 15px; line-height: 1.5; }
+        .btn {
+            padding: 12px 30px; font-size: 16px; border: none; border-radius: 25px;
+            cursor: pointer; font-weight: bold; transition: all 0.3s; margin: 5px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #4fc3f7, #0288d1); color: white; }
+        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(79,195,247,0.5); }
+        .hidden { display: none !important; }
+        #mobileControls { display: none; margin-top: 10px; }
+        @media (max-width: 800px) {
+            #mobileControls {
+                display: grid;
+                grid-template-areas: ". up ." "left down right";
+                grid-template-columns: 55px 55px 55px;
+                grid-template-rows: 55px 55px;
+                gap: 4px;
+            }
+        }
+        .ctrl-btn {
+            width: 55px; height: 55px;
+            border: 2px solid #4fc3f7;
+            background: rgba(79,195,247,0.2);
+            color: #4fc3f7; font-size: 22px;
+            border-radius: 10px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ctrl-btn:active { background: rgba(79,195,247,0.5); }
+        .up { grid-area: up; }
+        .left { grid-area: left; }
+        .down { grid-area: down; }
+        .right { grid-area: right; }
+    </style>
+</head>
+<body>
+    <h1 id="title">⚡ Energía Laberinto ⚡</h1>
+    <p id="instructions">Usa las teclas ↑↓←→ o WASD para mover el vehículo. ¡Evita los monstruos 👾!</p>
+    <div id="levelInfo">Presiona "Comenzar Juego" para iniciar</div>
+    <canvas id="gameCanvas" width="750" height="510"></canvas>
+    <div id="hud">
+        <div class="hud-item"><span class="label">NIVEL:</span><span class="value" id="hudLevel">-</span></div>
+        <div class="hud-item"><span class="label">FUENTE:</span><span class="value" id="hudSource">-</span></div>
+        <div class="hud-item"><span class="label">PUNTOS:</span><span class="value" id="hudScore">0</span></div>
+        <div class="hud-item"><span class="label">VIDAS:</span><span class="value" id="hudLives">❤️❤️❤️</span></div>
+    </div>
+    <div id="mobileControls">
+        <button class="ctrl-btn up" onclick="moveVehicle(0,-1)">▲</button>
+        <button class="ctrl-btn left" onclick="moveVehicle(-1,0)">◄</button>
+        <button class="ctrl-btn down" onclick="moveVehicle(0,1)">▼</button>
+        <button class="ctrl-btn right" onclick="moveVehicle(1,0)">►</button>
+    </div>
+
+    <div id="overlay">
+        <div class="overlay-content" id="overlayContent">
+            <h2>⚡ Energía Laberinto ⚡</h2>
+            <p>Navega tu vehículo desde la <strong>fuente de energía</strong> hasta la <strong>planta de procesamiento correcta</strong> que la convierte en electricidad.</p>
+            <p>20 niveles en total: los primeros 6 presentan cada tipo de energía, y del 7 al 20 se repiten aleatoriamente como repaso.</p>
+            <p>⚠️ <strong>¡Cuidado!</strong> Dos monstruos 👾 te persiguen. Si te atrapan, pierdes una vida.</p>
+            <button class="btn btn-primary" onclick="startGame()">🎮 Comenzar Juego</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const overlayContent = document.getElementById('overlayContent');
+
+        const COLS = 25;
+        const ROWS = 17;
+        const TILE = 30;
+        const TOTAL_LEVELS = 20;
+
+        let game = {
+            level: 0,
+            score: 0,
+            lives: 3,
+            started: false,
+            levelComplete: false,
+            gameOver: false,
+            wrongCooldown: false,
+            animFrame: 0,
+            currentLevelType: 0,
+            invulnerable: 0,
+            hitFlash: 0
+        };
+
+        let vehicle = { x: 0, y: 0, targetX: 0, targetY: 0, moving: false };
+        let maze = [];
+        let startPos = { r: 1, c: 1 };
+        let plants = [];
+        let monsters = [];
+
+        const monsterTypes = [
+            { icon: '👾', color: '#E040FB', name: 'Monstruo Violeta' },
+            { icon: '👹', color: '#FF1744', name: 'Demonio Rojo' },
+            { icon: '🐉', color: '#00E676', name: 'Dragón Verde' },
+            { icon: '🦇', color: '#AA00FF', name: 'Murciélago' },
+            { icon: '🕷️', color: '#FF6D00', name: 'Araña' },
+            { icon: '💀', color: '#B0BEC5', name: 'Calavera' }
+        ];
+
+        const levels = [
+            {
+                name: "Energía Solar", source: "☀️", sourceName: "Luz Solar", sourceColor: "#FFD700",
+                correctName: "Panel Solar", correctIcon: "🔆",
+                wrongPlants: [{ name: "Planta Nuclear", icon: "☢️" }, { name: "Torre Eólica", icon: "💨" }],
+                bgColor: "#0d1b2a", wallColor: "#1b3a4b", wallHi: "#2a5068", pathColor: "#0a1520",
+                desc: "La luz del sol es inagotable. ¿Qué planta la convierte en electricidad?"
+            },
+            {
+                name: "Energía Eólica", source: "💨", sourceName: "Viento", sourceColor: "#81D4FA",
+                correctName: "Torres Eólicas", correctIcon: "🌀",
+                wrongPlants: [{ name: "Planta Geotérmica", icon: "🌋" }, { name: "Planta Hidrocarburos", icon: "🛢️" }],
+                bgColor: "#00332a", wallColor: "#005a4a", wallHi: "#007a65", pathColor: "#001a15",
+                desc: "El viento mueve turbinas. ¿Qué instalación aprovecha esta energía?"
+            },
+            {
+                name: "Energía Nuclear", source: "☢️", sourceName: "Uranio", sourceColor: "#76FF03",
+                correctName: "Planta Nuclear", correctIcon: "⚛️",
+                wrongPlants: [{ name: "Panel Solar", icon: "🔆" }, { name: "Planta Hidroeléctrica", icon: "🌊" }],
+                bgColor: "#1a2e1a", wallColor: "#2d4a2d", wallHi: "#3d603d", pathColor: "#0a1a0a",
+                desc: "La fisión del uranio libera enorme energía. ¿Qué planta la aprovecha?"
+            },
+            {
+                name: "Energía Geotérmica", source: "🌋", sourceName: "Calor Terrestre", sourceColor: "#FF5722",
+                correctName: "Planta Geotérmica", correctIcon: "♨️",
+                wrongPlants: [{ name: "Torres Eólicas", icon: "🌀" }, { name: "Panel Solar", icon: "🔆" }],
+                bgColor: "#2a1008", wallColor: "#4a2010", wallHi: "#6a3018", pathColor: "#1a0800",
+                desc: "El calor interior de la Tierra genera electricidad. ¿Qué planta lo usa?"
+            },
+            {
+                name: "Energía Hidroeléctrica", source: "🌊", sourceName: "Agua", sourceColor: "#2196F3",
+                correctName: "Hidroeléctrica", correctIcon: "💧",
+                wrongPlants: [{ name: "Planta Nuclear", icon: "⚛️" }, { name: "Planta Geotérmica", icon: "♨️" }],
+                bgColor: "#0a1a3a", wallColor: "#153060", wallHi: "#1a4080", pathColor: "#050d1a",
+                desc: "El agua en movimiento tiene energía cinética. ¿Qué planta la transforma?"
+            },
+            {
+                name: "Energía de Hidrocarburos", source: "🛢️", sourceName: "Petróleo/Gas", sourceColor: "#FFAB91",
+                correctName: "Planta Hidrocarburos", correctIcon: "🏭",
+                wrongPlants: [{ name: "Torres Eólicas", icon: "🌀" }, { name: "Hidroeléctrica", icon: "💧" }],
+                bgColor: "#1a1008", wallColor: "#3a2818", wallHi: "#4a3820", pathColor: "#0d0800",
+                desc: "Los combustibles fósiles almacenan energía química. ¿Qué planta la convierte en electricidad?"
+            }
+        ];
+
+        // ===================== MAZE GENERATION =====================
+
+        function generateMaze() {
+            maze = [];
+            for (let r = 0; r < ROWS; r++) {
+                maze[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    maze[r][c] = 1;
+                }
+            }
+
+            const cellR = Math.floor(ROWS / 2);
+            const cellC = Math.floor(COLS / 2);
+            const visited = Array.from({ length: cellR }, () => Array(cellC).fill(false));
+
+            function carve(cr, cc) {
+                visited[cr][cc] = true;
+                const mr = cr * 2 + 1;
+                const mc = cc * 2 + 1;
+                maze[mr][mc] = 0;
+
+                const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                for (let i = dirs.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+                }
+
+                for (const [dr, dc] of dirs) {
+                    const nr = cr + dr;
+                    const nc = cc + dc;
+                    if (nr >= 0 && nr < cellR && nc >= 0 && nc < cellC && !visited[nr][nc]) {
+                        maze[mr + dr][mc + dc] = 0;
+                        carve(nr, nc);
+                    }
+                }
+            }
+
+            carve(0, 0);
+
+            let added = 0;
+            for (let attempt = 0; attempt < 300 && added < 20; attempt++) {
+                const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+                const c = 1 + Math.floor(Math.random() * (COLS - 2));
+                if (maze[r][c] === 1) {
+                    let open = 0;
+                    if (r > 0 && maze[r-1][c] === 0) open++;
+                    if (r < ROWS-1 && maze[r+1][c] === 0) open++;
+                    if (c > 0 && maze[r][c-1] === 0) open++;
+                    if (c < COLS-1 && maze[r][c+1] === 0) open++;
+                    if (open >= 2) {
+                        maze[r][c] = 0;
+                        added++;
+                    }
+                }
+            }
+        }
+
+        // ===================== BFS PATHFINDING =====================
+
+        function bfs(sr, sc, er, ec) {
+            if (maze[sr][sc] !== 0 || maze[er][ec] !== 0) return null;
+            const queue = [[sr, sc]];
+            const prev = {};
+            const key = (r, c) => r * COLS + c;
+            const visited = new Set();
+            visited.add(key(sr, sc));
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+
+            while (queue.length > 0) {
+                const [r, c] = queue.shift();
+                if (r === er && c === ec) {
+                    const path = [];
+                    let cur = [er, ec];
+                    while (cur) {
+                        path.unshift(cur);
+                        const k = key(cur[0], cur[1]);
+                        cur = prev[k] || null;
+                    }
+                    return path;
+                }
+                for (const [dr, dc] of dirs) {
+                    const nr = r + dr, nc = c + dc;
+                    const k = key(nr, nc);
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && maze[nr][nc] === 0 && !visited.has(k)) {
+                        visited.add(k);
+                        prev[k] = [r, c];
+                        queue.push([nr, nc]);
+                    }
+                }
+            }
+            return null;
+        }
+
+        function isReachable(sr, sc, er, ec) {
+            return bfs(sr, sc, er, ec) !== null;
+        }
+
+        // Get next step toward target using BFS
+        function getNextStepToward(fromR, fromC, toR, toC) {
+            const path = bfs(fromR, fromC, toR, toC);
+            if (!path || path.length < 2) return null;
+            return { r: path[1][0], c: path[1][1] };
+        }
+
+        // ===================== LEVEL SETUP =====================
+
+        function setupLevel(levelIdx) {
+            game.level = levelIdx;
+            game.levelComplete = false;
+            game.wrongCooldown = false;
+            game.invulnerable = 0;
+            game.hitFlash = 0;
+            vehicle.moving = false;
+
+            let levelTypeIdx;
+            if (levelIdx < 6) {
+                levelTypeIdx = levelIdx;
+            } else {
+                levelTypeIdx = Math.floor(Math.random() * 6);
+            }
+            game.currentLevelType = levelTypeIdx;
+
+            generateMaze();
+
+            const paths = [];
+            for (let r = 1; r < ROWS - 1; r++) {
+                for (let c = 1; c < COLS - 1; c++) {
+                    if (maze[r][c] === 0) paths.push({ r, c });
+                }
+            }
+
+            const startCands = paths.filter(p => p.r <= 4 && p.c <= 6);
+            startPos = startCands.length > 0
+                ? startCands[Math.floor(Math.random() * startCands.length)]
+                : paths[0];
+
+            plants = [];
+            const used = new Set();
+            used.add(startPos.r * COLS + startPos.c);
+
+            const lvl = levels[levelTypeIdx];
+            const allPlants = [
+                { name: lvl.correctName, icon: lvl.correctIcon, isCorrect: true },
+                { name: lvl.wrongPlants[0].name, icon: lvl.wrongPlants[0].icon, isCorrect: false },
+                { name: lvl.wrongPlants[1].name, icon: lvl.wrongPlants[1].icon, isCorrect: false }
+            ];
+            for (let i = allPlants.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allPlants[i], allPlants[j]] = [allPlants[j], allPlants[i]];
+            }
+
+            const zones = [
+                paths.filter(p => p.r >= ROWS - 5 && p.c <= 7),
+                paths.filter(p => p.r >= ROWS - 5 && p.c >= COLS - 8),
+                paths.filter(p => p.r >= ROWS - 5 && p.c > 7 && p.c < COLS - 8)
+            ];
+
+            for (let i = 0; i < 3; i++) {
+                let zone = zones[i].filter(p => !used.has(p.r * COLS + p.c));
+                if (zone.length === 0) zone = paths.filter(p => !used.has(p.r * COLS + p.c) && p.r >= ROWS - 6);
+                if (zone.length === 0) zone = paths.filter(p => !used.has(p.r * COLS + p.c) && p.r >= 4);
+                const pick = zone[Math.floor(Math.random() * zone.length)];
+                used.add(pick.r * COLS + pick.c);
+                plants.push({
+                    r: pick.r, c: pick.c,
+                    name: allPlants[i].name,
+                    icon: allPlants[i].icon,
+                    isCorrect: allPlants[i].isCorrect
+                });
+            }
+
+            for (const plant of plants) {
+                if (!isReachable(startPos.r, startPos.c, plant.r, plant.c)) {
+                    carvePath(startPos.r, startPos.c, plant.r, plant.c);
+                }
+            }
+            for (const plant of plants) {
+                addAltPaths(startPos.r, startPos.c, plant.r, plant.c);
+            }
+
+            // Setup monsters
+            setupMonsters(paths);
+
+            vehicle.x = startPos.c * TILE + TILE / 2;
+            vehicle.y = startPos.r * TILE + TILE / 2;
+            vehicle.targetX = vehicle.x;
+            vehicle.targetY = vehicle.y;
+            vehicle.moving = false;
+
+            updateHUD();
+            updateLevelInfo();
+        }
+
+        function setupMonsters(paths) {
+            monsters = [];
+            const used = new Set();
+            used.add(startPos.r * COLS + startPos.c);
+            for (const p of plants) used.add(p.r * COLS + p.c);
+
+            // Pick monster types randomly
+            const shuffledTypes = [...monsterTypes];
+            for (let i = shuffledTypes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledTypes[i], shuffledTypes[j]] = [shuffledTypes[j], shuffledTypes[i]];
+            }
+
+            for (let i = 0; i < 2; i++) {
+                // Place monsters far from start (in middle/bottom area)
+                let candidates = paths.filter(p =>
+                    !used.has(p.r * COLS + p.c) &&
+                    p.r >= 6 &&
+                    (Math.abs(p.r - startPos.r) + Math.abs(p.c - startPos.c)) > 8
+                );
+                if (candidates.length === 0) {
+                    candidates = paths.filter(p =>
+                        !used.has(p.r * COLS + p.c) &&
+                        (Math.abs(p.r - startPos.r) + Math.abs(p.c - startPos.c)) > 5
+                    );
+                }
+                if (candidates.length === 0) {
+                    candidates = paths.filter(p => !used.has(p.r * COLS + p.c));
+                }
+
+                const pick = candidates[Math.floor(Math.random() * candidates.length)];
+                used.add(pick.r * COLS + pick.c);
+
+                monsters.push({
+                    r: pick.r,
+                    c: pick.c,
+                    x: pick.c * TILE + TILE / 2,
+                    y: pick.r * TILE + TILE / 2,
+                    targetX: pick.c * TILE + TILE / 2,
+                    targetY: pick.r * TILE + TILE / 2,
+                    moving: false,
+                    type: shuffledTypes[i],
+                    animOffset: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        function carvePath(sr, sc, er, ec) {
+            let r = sr, c = sc;
+            while (c !== ec) {
+                c += (ec > c) ? 1 : -1;
+                if (r >= 0 && r < ROWS && c >= 0 && c < COLS) maze[r][c] = 0;
+            }
+            while (r !== er) {
+                r += (er > r) ? 1 : -1;
+                if (r >= 0 && r < ROWS && c >= 0 && c < COLS) maze[r][c] = 0;
+            }
+        }
+
+        function addAltPaths(sr, sc, er, ec) {
+            const path = bfs(sr, sc, er, ec);
+            if (!path || path.length < 4) return;
+
+            const numOpenings = 2 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < numOpenings; i++) {
+                const idx = 1 + Math.floor(Math.random() * (path.length - 2));
+                const [pr, pc] = path[idx];
+                const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                for (let d = dirs.length - 1; d > 0; d--) {
+                    const j = Math.floor(Math.random() * (d + 1));
+                    [dirs[d], dirs[j]] = [dirs[j], dirs[d]];
+                }
+                for (const [dr, dc] of dirs) {
+                    const nr = pr + dr, nc = pc + dc;
+                    if (nr > 0 && nr < ROWS - 1 && nc > 0 && nc < COLS - 1 && maze[nr][nc] === 1) {
+                        const nnr = nr + dr, nnc = nc + dc;
+                        if (nnr > 0 && nnr < ROWS - 1 && nnc > 0 && nnc < COLS - 1 && maze[nnr][nnc] === 0) {
+                            maze[nr][nc] = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ===================== MONSTER AI =====================
+
+        function moveMonsters() {
+            if (game.levelComplete || game.gameOver) return;
+
+            const playerC = Math.round((vehicle.x - TILE / 2) / TILE);
+            const playerR = Math.round((vehicle.y - TILE / 2) / TILE);
+
+            for (const monster of monsters) {
+                // Get next step toward player using BFS
+                const next = getNextStepToward(monster.r, monster.c, playerR, playerC);
+                if (next) {
+                    monster.r = next.r;
+                    monster.c = next.c;
+                    monster.targetX = next.c * TILE + TILE / 2;
+                    monster.targetY = next.r * TILE + TILE / 2;
+                    monster.moving = true;
+                }
+
+                // Check collision with player
+                if (monster.r === playerR && monster.c === playerC && game.invulnerable <= 0) {
+                    monsterHit(monster);
+                }
+            }
+        }
+
+        function monsterHit(monster) {
+            game.lives--;
+            game.invulnerable = 3; // 3 player moves of invulnerability
+            game.hitFlash = 15; // visual flash frames
+            updateHUD();
+
+            if (game.lives <= 0) {
+                setTimeout(showGameOver, 800);
+            } else {
+                // Teleport monster far from player
+                respawnMonster(monster);
+            }
+        }
+
+        function respawnMonster(monster) {
+            const paths = [];
+            for (let r = 1; r < ROWS - 1; r++) {
+                for (let c = 1; c < COLS - 1; c++) {
+                    if (maze[r][c] === 0) paths.push({ r, c });
+                }
+            }
+
+            const playerC = Math.round((vehicle.x - TILE / 2) / TILE);
+            const playerR = Math.round((vehicle.y - TILE / 2) / TILE);
+
+            // Find cells far from player
+            let farCells = paths.filter(p =>
+                (Math.abs(p.r - playerR) + Math.abs(p.c - playerC)) > 10
+            );
+            if (farCells.length === 0) {
+                farCells = paths.filter(p =>
+                    (Math.abs(p.r - playerR) + Math.abs(p.c - playerC)) > 6
+                );
+            }
+            if (farCells.length === 0) farCells = paths;
+
+            // Don't place on plants or other monsters
+            const occupied = new Set();
+            occupied.add(startPos.r * COLS + startPos.c);
+            for (const p of plants) occupied.add(p.r * COLS + p.c);
+            for (const m of monsters) {
+                if (m !== monster) occupied.add(m.r * COLS + m.c);
+            }
+
+            farCells = farCells.filter(p => !occupied.has(p.r * COLS + p.c));
+            if (farCells.length === 0) farCells = paths.filter(p => !occupied.has(p.r * COLS + p.c));
+            if (farCells.length === 0) farCells = paths;
+
+            const pick = farCells[Math.floor(Math.random() * farCells.length)];
+            monster.r = pick.r;
+            monster.c = pick.c;
+            monster.x = pick.c * TILE + TILE / 2;
+            monster.y = pick.r * TILE + TILE / 2;
+            monster.targetX = monster.x;
+            monster.targetY = monster.y;
+            monster.moving = false;
+        }
+
+        function updateMonsterPositions() {
+            for (const monster of monsters) {
+                if (!monster.moving) continue;
+                const speed = 4;
+                const dx = monster.targetX - monster.x;
+                const dy = monster.targetY - monster.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < speed) {
+                    monster.x = monster.targetX;
+                    monster.y = monster.targetY;
+                    monster.moving = false;
+                } else {
+                    monster.x += (dx / dist) * speed;
+                    monster.y += (dy / dist) * speed;
+                }
+            }
+        }
+
+        // ===================== HUD =====================
+
+        function updateHUD() {
+            const lvl = levels[game.currentLevelType];
+            document.getElementById('hudLevel').textContent = `${game.level + 1}/${TOTAL_LEVELS}`;
+            document.getElementById('hudSource').textContent = `${lvl.source} ${lvl.sourceName}`;
+            document.getElementById('hudScore').textContent = game.score;
+            document.getElementById('hudLives').textContent = '❤️'.repeat(game.lives) + '🖤'.repeat(3 - game.lives);
+        }
+
+        function updateLevelInfo() {
+            const lvl = levels[game.currentLevelType];
+            const reviewNote = game.level >= 6 ? ' <span style="color:#81c784;">(Repaso)</span>' : '';
+            document.getElementById('levelInfo').innerHTML =
+                `<strong>Nivel ${game.level + 1}: ${lvl.name}</strong>${reviewNote} — ${lvl.desc}`;
+        }
+
+        // ===================== DRAWING =====================
+
+        function drawGame() {
+            if (!game.started) {
+                drawStartScreen();
+                return;
+            }
+
+            const lvl = levels[game.currentLevelType];
+
+            // Hit flash effect
+            if (game.hitFlash > 0) {
+                ctx.fillStyle = game.hitFlash % 4 < 2 ? '#3a0000' : lvl.bgColor;
+                game.hitFlash--;
+            } else {
+                ctx.fillStyle = lvl.bgColor;
+            }
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw maze
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const x = c * TILE;
+                    const y = r * TILE;
+                    if (maze[r][c] === 1) {
+                        ctx.fillStyle = lvl.wallColor;
+                        ctx.fillRect(x, y, TILE, TILE);
+                        ctx.fillStyle = lvl.wallHi;
+                        ctx.fillRect(x, y, TILE, 2);
+                        ctx.fillRect(x, y, 2, TILE);
+                        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                        ctx.fillRect(x, y + TILE - 2, TILE, 2);
+                        ctx.fillRect(x + TILE - 2, y, 2, TILE);
+                    } else {
+                        ctx.fillStyle = lvl.pathColor;
+                        ctx.fillRect(x, y, TILE, TILE);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+                        ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+                    }
+                }
+            }
+
+            // Draw energy source
+            const sx = startPos.c * TILE + TILE / 2;
+            const sy = startPos.r * TILE + TILE / 2;
+            const pulse = Math.sin(game.animFrame * 0.06) * 0.3 + 0.7;
+            const grad = ctx.createRadialGradient(sx, sy, 2, sx, sy, TILE * 1.5);
+            const alpha = Math.floor(pulse * 180).toString(16).padStart(2, '0');
+            grad.addColorStop(0, lvl.sourceColor + alpha);
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, TILE * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.font = '22px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(lvl.source, sx, sy);
+
+            // Draw plants
+            for (const plant of plants) {
+                const px = plant.c * TILE + TILE / 2;
+                const py = plant.r * TILE + TILE / 2;
+
+                const glowColor = plant.isCorrect ? 'rgba(76,175,80,0.2)' : 'rgba(255,152,0,0.2)';
+                ctx.fillStyle = glowColor;
+                ctx.beginPath();
+                ctx.arc(px, py, TILE * 1.1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = plant.isCorrect ? 'rgba(76,175,80,0.35)' : 'rgba(255,152,0,0.35)';
+                ctx.beginPath();
+                ctx.arc(px, py, TILE * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = plant.isCorrect ? '#4CAF50' : '#FF9800';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(px, py, TILE * 0.55, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+
+                ctx.font = '20px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(plant.icon, px, py);
+
+                ctx.font = 'bold 8px sans-serif';
+                ctx.fillStyle = '#fff';
+                const label = plant.name.length > 16 ? plant.name.substring(0, 14) + '..' : plant.name;
+                ctx.fillText(label, px, py + TILE * 0.75);
+            }
+
+            // Draw monsters
+            drawMonsters();
+
+            // Draw vehicle
+            drawVehicle();
+
+            // Level complete overlay
+            if (game.levelComplete) {
+                ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = 'bold 34px sans-serif';
+                ctx.fillStyle = '#4CAF50';
+                ctx.textAlign = 'center';
+                ctx.fillText('¡NIVEL COMPLETADO!', canvas.width / 2, canvas.height / 2 - 25);
+                ctx.font = '18px sans-serif';
+                ctx.fillStyle = '#fff';
+                ctx.fillText(`+100 puntos  ${lvl.correctIcon} ${lvl.correctName}`, canvas.width / 2, canvas.height / 2 + 15);
+                ctx.font = '14px sans-serif';
+                ctx.fillStyle = '#aaa';
+                ctx.fillText(`${lvl.source} ${lvl.sourceName} → ${lvl.correctIcon} ${lvl.correctName}`, canvas.width / 2, canvas.height / 2 + 45);
+            }
+
+            game.animFrame++;
+        }
+
+        function drawMonsters() {
+            for (const monster of monsters) {
+                const mx = monster.x;
+                const my = monster.y;
+                const bounce = Math.sin(game.animFrame * 0.1 + monster.animOffset) * 2;
+
+                // Monster glow / danger aura
+                const auraGrad = ctx.createRadialGradient(mx, my + bounce, 2, mx, my + bounce, TILE * 0.9);
+                auraGrad.addColorStop(0, monster.type.color + '40');
+                auraGrad.addColorStop(1, 'transparent');
+                ctx.fillStyle = auraGrad;
+                ctx.beginPath();
+                ctx.arc(mx, my + bounce, TILE * 0.9, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Monster body (dark circle)
+                ctx.fillStyle = monster.type.color + '60';
+                ctx.beginPath();
+                ctx.arc(mx, my + bounce, TILE * 0.42, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = monster.type.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(mx, my + bounce, TILE * 0.42, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+
+                // Monster icon
+                ctx.font = '18px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(monster.type.icon, mx, my + bounce);
+            }
+        }
+
+        function drawStartScreen() {
+            ctx.fillStyle = '#0d1b2a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'bold 28px sans-serif';
+            ctx.fillStyle = '#4fc3f7';
+            ctx.textAlign = 'center';
+            ctx.fillText('⚡ Energía Laberinto ⚡', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.font = '16px sans-serif';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('Presiona "Comenzar Juego" para iniciar', canvas.width / 2, canvas.height / 2 + 10);
+            ctx.font = '40px serif';
+            ctx.fillText('🔋', canvas.width / 2, canvas.height / 2 + 70);
+            game.animFrame++;
+        }
+
+        function drawVehicle() {
+            const x = vehicle.x;
+            const y = vehicle.y;
+            const s = TILE * 0.7;
+
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Invulnerability blink
+            if (game.invulnerable > 0 && game.animFrame % 6 < 3) {
+                ctx.globalAlpha = 0.4;
+            }
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(1, s / 3 + 2, s / 2.2, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Body
+            ctx.fillStyle = '#4FC3F7';
+            ctx.beginPath();
+            roundRect(ctx, -s / 2, -s / 3.5, s, s * 0.55, 4);
+            ctx.fill();
+
+            // Cabin
+            ctx.fillStyle = '#0288D1';
+            ctx.beginPath();
+            roundRect(ctx, -s / 3.5, -s / 2.5, s * 0.5, s * 0.3, 3);
+            ctx.fill();
+
+            // Windshield
+            ctx.fillStyle = '#B3E5FC';
+            ctx.beginPath();
+            roundRect(ctx, -s / 5, -s / 2.3, s * 0.28, s * 0.18, 2);
+            ctx.fill();
+
+            // Wheels
+            ctx.fillStyle = '#222';
+            ctx.beginPath(); ctx.arc(-s / 3, s / 4.5, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(s / 3.5, s / 4.5, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#555';
+            ctx.beginPath(); ctx.arc(-s / 3, s / 4.5, 2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(s / 3.5, s / 4.5, 2, 0, Math.PI * 2); ctx.fill();
+
+            // Headlights
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath(); ctx.arc(s / 2 - 2, -s / 10, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(s / 2 - 2, s / 10, 2.5, 0, Math.PI * 2); ctx.fill();
+
+            // Bolt
+            ctx.fillStyle = '#FFD700';
+            ctx.font = '10px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚡', 0, -1);
+
+            // Shield indicator when invulnerable
+            if (game.invulnerable > 0) {
+                ctx.strokeStyle = '#4FC3F7';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 0.6, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.lineWidth = 1;
+            }
+
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        }
+
+        // ===================== MOVEMENT =====================
+
+        function moveVehicle(dx, dy) {
+            if (!game.started || game.levelComplete || game.gameOver || game.wrongCooldown) return;
+            if (vehicle.moving) return;
+
+            const curC = Math.round((vehicle.x - TILE / 2) / TILE);
+            const curR = Math.round((vehicle.y - TILE / 2) / TILE);
+            const newC = curC + dx;
+            const newR = curR + dy;
+
+            if (newC >= 0 && newC < COLS && newR >= 0 && newR < ROWS && maze[newR][newC] === 0) {
+                vehicle.targetX = newC * TILE + TILE / 2;
+                vehicle.targetY = newR * TILE + TILE / 2;
+                vehicle.moving = true;
+
+                // Decrease invulnerability counter
+                if (game.invulnerable > 0) game.invulnerable--;
+
+                // Move monsters AFTER player moves
+                moveMonsters();
+
+                // Check plant collision
+                checkPlant(newC, newR);
+
+                // Check monster collision at new position
+                checkMonsterCollision(newC, newR);
+            }
+        }
+
+        function checkMonsterCollision(col, row) {
+            if (game.invulnerable > 0) return;
+            for (const monster of monsters) {
+                if (monster.r === row && monster.c === col) {
+                    monsterHit(monster);
+                    break;
+                }
+            }
+        }
+
+        function checkPlant(col, row) {
+            for (const plant of plants) {
+                if (plant.c === col && plant.r === row) {
+                    if (plant.isCorrect) {
+                        game.levelComplete = true;
+                        game.score += 100;
+                        updateHUD();
+                        setTimeout(() => {
+                            if (game.level < TOTAL_LEVELS - 1) {
+                                setupLevel(game.level + 1);
+                            } else {
+                                showVictory();
+                            }
+                        }, 2500);
+                    } else {
+                        game.lives--;
+                        game.wrongCooldown = true;
+                        updateHUD();
+                        showWrong(plant.name);
+                        if (game.lives <= 0) {
+                            setTimeout(showGameOver, 1800);
+                        } else {
+                            setTimeout(() => {
+                                vehicle.x = startPos.c * TILE + TILE / 2;
+                                vehicle.y = startPos.r * TILE + TILE / 2;
+                                vehicle.targetX = vehicle.x;
+                                vehicle.targetY = vehicle.y;
+                                vehicle.moving = false;
+                                game.wrongCooldown = false;
+                            }, 1800);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        function showWrong(name) {
+            overlay.classList.remove('hidden');
+            overlayContent.innerHTML = `
+                <h2 style="color:#F44336;">❌ ¡Incorrecto!</h2>
+                <p><strong>${name}</strong> no procesa esta fuente de energía.</p>
+                <p>Vidas restantes: ${'❤️'.repeat(game.lives)}</p>
+            `;
+            setTimeout(() => overlay.classList.add('hidden'), 1700);
+        }
+
+        function showGameOver() {
+            game.gameOver = true;
+            overlay.classList.remove('hidden');
+            overlayContent.innerHTML = `
+                <h2 style="color:#F44336;">💀 ¡Juego Terminado!</h2>
+                <p>Puntuación: <strong>${game.score}</strong> puntos</p>
+                <p>Nivel alcanzado: <strong>${game.level + 1}/${TOTAL_LEVELS}</strong></p>
+                <button class="btn btn-primary" onclick="restartGame()">🔄 Jugar de Nuevo</button>
+            `;
+        }
+
+        function showVictory() {
+            overlay.classList.remove('hidden');
+            overlayContent.innerHTML = `
+                <h2 style="color:#4CAF50;">🏆 ¡Felicidades!</h2>
+                <p>¡Completaste los 20 niveles!</p>
+                <p>Puntuación final: <strong>${game.score}</strong> puntos</p>
+                <p style="margin-top:15px; font-size:14px; color:#81c784;">Has dominado las fuentes de energía y sus plantas de procesamiento.</p>
+                <div style="text-align:left; background:rgba(0,0,0,0.3); padding:12px; border-radius:10px; font-size:13px; line-height:2; margin-top:10px;">
+                    <p>☀️ Solar → 🔆 Panel Solar</p>
+                    <p>💨 Eólica → 🌀 Torres Eólicas</p>
+                    <p>☢️ Nuclear → ⚛️ Planta Nuclear</p>
+                    <p>🌋 Geotérmica → ♨️ Planta Geotérmica</p>
+                    <p>🌊 Hidráulica → 💧 Hidroeléctrica</p>
+                    <p>🛢️ Hidrocarburos → 🏭 Planta Hidrocarburos</p>
+                </div>
+                <br>
+                <button class="btn btn-primary" onclick="restartGame()">🔄 Jugar de Nuevo</button>
+            `;
+        }
+
+        function startGame() {
+            overlay.classList.add('hidden');
+            game.started = true;
+            game.score = 0;
+            game.lives = 3;
+            game.gameOver = false;
+            setupLevel(0);
+        }
+
+        function restartGame() {
+            overlay.classList.add('hidden');
+            game.started = true;
+            game.score = 0;
+            game.lives = 3;
+            game.gameOver = false;
+            setupLevel(0);
+        }
+
+        // ===================== UPDATE LOOP =====================
+
+        function updateVehicle() {
+            if (!vehicle.moving) return;
+            const speed = 5;
+            const dx = vehicle.targetX - vehicle.x;
+            const dy = vehicle.targetY - vehicle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < speed) {
+                vehicle.x = vehicle.targetX;
+                vehicle.y = vehicle.targetY;
+                vehicle.moving = false;
+            } else {
+                vehicle.x += (dx / dist) * speed;
+                vehicle.y += (dy / dist) * speed;
+            }
+        }
+
+        // ===================== INPUT =====================
+
+        document.addEventListener('keydown', (e) => {
+            if (!game.started || game.gameOver) return;
+            switch (e.key) {
+                case 'ArrowUp': case 'w': case 'W': e.preventDefault(); moveVehicle(0, -1); break;
+                case 'ArrowDown': case 's': case 'S': e.preventDefault(); moveVehicle(0, 1); break;
+                case 'ArrowLeft': case 'a': case 'A': e.preventDefault(); moveVehicle(-1, 0); break;
+                case 'ArrowRight': case 'd': case 'D': e.preventDefault(); moveVehicle(1, 0); break;
+            }
+        });
+
+        let touchSX = 0, touchSY = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchSX = e.touches[0].clientX;
+            touchSY = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+        canvas.addEventListener('touchend', (e) => {
+            const dx = e.changedTouches[0].clientX - touchSX;
+            const dy = e.changedTouches[0].clientY - touchSY;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 30) moveVehicle(1, 0);
+                else if (dx < -30) moveVehicle(-1, 0);
+            } else {
+                if (dy > 30) moveVehicle(0, 1);
+                else if (dy < -30) moveVehicle(0, -1);
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        // ===================== GAME LOOP =====================
+
+        function gameLoop() {
+            updateVehicle();
+            updateMonsterPositions();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
